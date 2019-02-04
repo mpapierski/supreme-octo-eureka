@@ -17,6 +17,9 @@ write_queue = Queue('db.write', exchange=exchange, routing_key='db.write')
 
 
 class RPCClient(object):
+    """A basic "RPC" client that keeps state,
+    and polls for the response in a blocking way.
+    """
 
     def __init__(self, connection):
         self.connection = connection

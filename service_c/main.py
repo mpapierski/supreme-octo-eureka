@@ -50,19 +50,22 @@ def on_read(conn, message):
 
 def main():
     with Connection('amqp://guest:guest@rabbitmq//') as conn:
+        # Can't rely on the fact that the connection is available immediately due to
+        # docker-compose startup delays
         hub = Hub()
         while True:
             try:
                 conn.register_with_event_loop(hub)
             except Exception as e:
+                # This should be an exponential backoff, but left as is for simplicity
                 time.sleep(1.)
                 print('Unable to connect', e)
             else:
                 print('Success!')
                 break
 
-        with Consumer(conn, [write_queue], on_message=on_write) as consumer:
-            with Consumer(conn, [read_queue], on_message=partial(on_read, conn)) as consumer:
+        with Consumer(conn, [write_queue], on_message=on_write):
+            with Consumer(conn, [read_queue], on_message=partial(on_read, conn)):
                 hub.run_forever()
 
 
