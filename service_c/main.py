@@ -19,6 +19,8 @@ write_queue = Queue('db.write', exchange=exchange, routing_key='db.write')
 
 
 def on_write(message):
+    """Receives message on db.write queue
+    """
     print('Write received', message)
     body = json.loads(message.body)
     try:
@@ -28,6 +30,8 @@ def on_write(message):
 
 
 def on_read(conn, message):
+    """Receives a message on db.read queue
+    """
     body = json.loads(message.body)
     print('Read received', body)
     with Producer(conn) as producer:

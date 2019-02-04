@@ -15,15 +15,6 @@ read_queue = Queue('db.read', exchange=exchange, routing_key='db.read')
 write_queue = Queue('db.write', exchange=exchange, routing_key='db.write')
 
 
-def db_write(conn, key, value):
-    producer = conn.Producer(serializer='json')
-    producer.publish({
-        'key': key,
-        'value': value
-    }, exchange=exchange, routing_key='db.write', declare=[write_queue])
-    print('Ok')
-
-
 class RPCClient(object):
 
     def __init__(self, connection):
@@ -53,46 +44,26 @@ class RPCClient(object):
         return self.response['result']
 
 
-def db_read(conn, key):
-    rpc = RPCClient(conn)
-    return rpc.call(key)
+from flask import Flask, request, Response
+app = Flask(__name__)
 
-
-def on_command(conn, line):
-    cmd, args = shlex.split(line)
-    if cmd == 'write':
-        key, value = args.split('=')
-        print('Key {} Value {}'.format(key, value))
-        db_write(conn, key, value)
-    elif cmd == 'read':
-        key = args
-        result = db_read(conn, key)
-        print('Result', result)
-
-
-buffer = b''
-
-
-def stdin_callback(conn):
-    global buffer
-    data = os.read(sys.stdin.fileno(), 1024)
-    if not data:
-        print('EOF')
-        hub.stop()
-    buffer += data
-    index = buffer.find(b'\n')
-    if index != -1:
-        command = buffer[:index].decode('utf-8')
-        buffer = buffer[index + 1:]
-        on_command(conn, command)
-
-
-def main():
+@app.route("/db", methods=['POST'])
+def db_write():
     with Connection('amqp://guest:guest@localhost//') as conn:
         conn.register_with_event_loop(hub)
-        hub.add_reader(sys.stdin.fileno(), stdin_callback, conn)
-        hub.run_forever()
+        producer = conn.Producer(serializer='json')
+        producer.publish({
+            'key': request.form['key'],
+            'value': request.form['value'],
+        }, exchange=exchange, routing_key='db.write', declare=[write_queue])
+        return Response('', status=201)
 
-
-if __name__ == '__main__':
-    main()
+@app.route('/db/<key>', methods=['GET'])
+def db_read(key):
+    with Connection('amqp://guest:guest@localhost//') as conn:
+        rpc = RPCClient(conn)
+        result = rpc.call(key)
+        if result is None:
+            return '', 404
+        else:
+            return result, 200
