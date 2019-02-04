@@ -1,0 +1,21 @@
+version: '3'
+
+services:
+  rabbitmq:
+    image: rabbitmq
+  web:
+    build: service_a/
+    command: python main.py
+    volumes:
+      - ./service_a/:/code
+    ports:
+      - "5000:5000"
+    depends_on:
+      - rabbitmq
+  worker:
+    build: service_c/
+    command: python main.py
+    volumes:
+      - ./service_c/:/code
+    depends_on:
+      - rabbitmq

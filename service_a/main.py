@@ -1,3 +1,4 @@
+from flask import Flask, request, Response
 import time
 import sys
 import os
@@ -44,12 +45,12 @@ class RPCClient(object):
         return self.response['result']
 
 
-from flask import Flask, request, Response
 app = Flask(__name__)
+
 
 @app.route("/db", methods=['POST'])
 def db_write():
-    with Connection('amqp://guest:guest@localhost//') as conn:
+    with Connection('amqp://guest:guest@rabbitmq//') as conn:
         conn.register_with_event_loop(hub)
         producer = conn.Producer(serializer='json')
         producer.publish({
@@ -58,12 +59,17 @@ def db_write():
         }, exchange=exchange, routing_key='db.write', declare=[write_queue])
         return Response('', status=201)
 
+
 @app.route('/db/<key>', methods=['GET'])
 def db_read(key):
-    with Connection('amqp://guest:guest@localhost//') as conn:
+    with Connection('amqp://guest:guest@rabbitmq//') as conn:
         rpc = RPCClient(conn)
         result = rpc.call(key)
         if result is None:
             return '', 404
         else:
             return result, 200
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", debug=True)

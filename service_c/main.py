@@ -1,5 +1,6 @@
 from __future__ import absolute_import, unicode_literals
 import json
+import time
 from kombu import Connection, Queue
 from kombu import Connection, Exchange, Queue, Producer, Consumer
 from kombu.asynchronous import Hub
@@ -10,8 +11,6 @@ from functools import partial
 
 from db import db_write
 from db import db_read
-
-hub = Hub()
 
 exchange = Exchange('supreme-octo-eureka', 'direct', durable=False)
 read_queue = Queue('db.read', exchange=exchange, routing_key='db.read')
@@ -50,8 +49,18 @@ def on_read(conn, message):
 
 
 def main():
-    with Connection('amqp://guest:guest@localhost//') as conn:
-        conn.register_with_event_loop(hub)
+    with Connection('amqp://guest:guest@rabbitmq//') as conn:
+        hub = Hub()
+        while True:
+            try:
+                conn.register_with_event_loop(hub)
+            except Exception as e:
+                time.sleep(1.)
+                print('Unable to connect', e)
+            else:
+                print('Success!')
+                break
+
         with Consumer(conn, [write_queue], on_message=on_write) as consumer:
             with Consumer(conn, [read_queue], on_message=partial(on_read, conn)) as consumer:
                 hub.run_forever()
